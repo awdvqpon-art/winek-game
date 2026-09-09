@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>وينك؟! V3</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101820;font-family:Arial,sans-serif;color:#fff}
+#game{position:relative;width:100vw;height:100vh;min-height:320px;overflow:hidden;touch-action:none}
+#world{position:absolute;inset:0;background:#263238}
+.room{position:absolute;border:5px solid #90a4ae;background:#3d4e55;box-shadow:inset 0 0 0 2px #263238}
+.room span{position:absolute;right:8px;top:7px;font-weight:bold;font-size:clamp(11px,1.8vw,17px)}
+.door{position:absolute;background:#8d6e63;border:2px solid #5d4037}
+#spots{position:absolute;inset:0;z-index:2}
+.spot{position:absolute;width:clamp(50px,7vw,76px);height:clamp(50px,7vw,76px);border-radius:15px;background:#263238dd;border:2px dashed #cfd8dc;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:clamp(25px,4vw,38px)}
+.spot small{font-size:10px}
+#players{position:absolute;inset:0;z-index:4}
+.p{position:absolute;width:36px;height:36px;border-radius:50%;transform:translate(-50%,-50%);border:3px solid #fff;box-shadow:0 3px 8px #000}
+.p b{position:absolute;top:36px;right:50%;transform:translateX(50%);white-space:nowrap;font-size:11px;text-shadow:0 2px 4px #000}
+.hiddenp{opacity:.2}
+#hud{position:absolute;z-index:8;top:9px;left:9px;right:9px;display:flex;justify-content:space-between;gap:7px}
+.panel{background:#000b;padding:8px 11px;border-radius:12px;font-weight:bold;font-size:13px}
+#controls{position:absolute;z-index:9;left:13px;bottom:13px;width:150px;height:150px}
+.ctrl{position:absolute!important;width:48px!important;height:48px!important;margin:0!important;padding:0!important;background:#ffffff2e!important;border:1px solid #ffffff55!important;color:white}
+#up{left:51px;top:0}#down{left:51px;bottom:0}#left{left:0;top:51px}#right{right:0;top:51px}
+.action{position:absolute;z-index:9;bottom:25px;width:125px;padding:13px;border:0;border-radius:14px;color:#fff;font-size:15px;font-weight:bold}
+#hide{right:18px;background:#7e57c2}
+#capture{right:153px;background:#e53935;display:none}
+#menu,#result{position:absolute;z-index:20;inset:0;display:flex;align-items:center;justify-content:center;background:#000c}
+.card{width:min(440px,90vw);background:#1e292e;padding:22px;border-radius:20px;text-align:center;box-shadow:0 10px 35px #000}
+input,button{font:inherit}input{width:100%;padding:13px;border:0;border-radius:12px;margin:6px 0;background:#fff;color:#222}
+.card button{width:100%;padding:13px;margin:6px 0;border:0;border-radius:12px;background:#00bfa5;color:#fff;font-weight:bold}
+.card button.secondary{background:#455a64}
+#msg{min-height:22px;color:#ffcc80}
+#toast{position:absolute;z-index:15;top:58px;left:50%;transform:translateX(-50%);background:#000c;padding:8px 12px;border-radius:12px;display:none}
+</style>
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div id="game">
+<div id="world">
+ <div class="room" style="left:3%;top:10%;width:43%;height:35%"><span>الصالة 🛋️</span></div>
+ <div class="room" style="left:50%;top:10%;width:47%;height:35%"><span>غرفة النوم 🛏️</span></div>
+ <div class="room" style="left:3%;top:49%;width:43%;height:44%"><span>المطبخ 🍳</span></div>
+ <div class="room" style="left:50%;top:49%;width:47%;height:44%"><span>الحديقة 🌳</span></div>
+ <div class="door" style="left:45%;top:25%;width:6%;height:7%"></div>
+ <div class="door" style="left:45%;top:64%;width:6%;height:7%"></div>
+</div>
+<div id="spots">
+ <div class="spot" style="left:16%;top:20%">🛋️<small>كنبة</small></div>
+ <div class="spot" style="left:75%;top:20%">🛏️<small>سرير</small></div>
+ <div class="spot" style="left:18%;top:70%">🗄️<small>خزانة</small></div>
+ <div class="spot" style="left:76%;top:70%">🌳<small>شجرة</small></div>
+</div>
+<div id="players"></div>
+<div id="hud"><div class="panel" id="roomTxt">الغرفة: —</div><div class="panel" id="roleTxt">الدور: —</div><div class="panel" id="timeTxt">الوقت: —</div></div>
+<div id="toast"></div>
+<button class="action" id="hide">اختبئ</button>
+<button class="action" id="capture">امسك 🔎</button>
+<div id="controls">
+<button class="ctrl" id="up">▲</button><button class="ctrl" id="down">▼</button>
+<button class="ctrl" id="left">◀</button><button class="ctrl" id="right">▶</button>
+</div>
+<div id="menu"><div class="card">
+<h1>وينك؟! 🏠</h1><p>V3 — ماب البيت الأونلاين</p>
+<input id="name" maxlength="12" placeholder="اكتب اسمك">
+<input id="code" maxlength="8" placeholder="كود الغرفة للانضمام">
+<button id="create">إنشاء غرفة</button><button class="secondary" id="join">دخول غرفة</button>
+<div id="msg"></div>
+</div></div>
+<div id="result"><div class="card"><h1 id="resultTitle"></h1><p id="resultText"></p><button onclick="location.reload()">لعب من جديد</button></div></div>
+</div>
+<script>
+const socket=io({transports:['websocket','polling']});
+let me=null,hidden=false,players={},roomCode=null;
+const $=id=>document.getElementById(id);
+function say(t){$('msg').textContent=t}
+function toast(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').style.display='none',2200)}
+function enter(mode){
+ const name=($('name').value||'لاعب').trim();
+ const code=$('code').value.trim().toUpperCase();
+ if(mode==='create')socket.emit('createRoom',{name});
+ else if(code)socket.emit('joinRoom',{name,code});
+ else say('اكتب كود الغرفة');
+}
+$('create').onclick=()=>enter('create');$('join').onclick=()=>enter('join');
+socket.on('connect',()=>say('متصل بالسيرفر ✅'));
+socket.on('connect_error',()=>say('تعذر الاتصال بالسيرفر'));
+socket.on('created',d=>{roomCode=d.code;$('code').value=d.code;say('كود الغرفة: '+d.code)});
+socket.on('joined',d=>{me=d.id;roomCode=d.code;$('menu').style.display='none';$('roomTxt').textContent='الغرفة: '+d.code});
+socket.on('errorMsg',say);
+socket.on('notice',toast);
+socket.on('state',st=>{
+ players=st.players||{};
+ $('timeTxt').textContent='الوقت: '+(st.time??'—')+' ث';
+ const p=players[me]; if(p)$('roleTxt').textContent='الدور: '+(p.role==='seeker'?'الباحث 🔎':'مختبئ 🙈');
+ render();
+});
+socket.on('caught',d=>{
+ if(d.id===me){$('resultTitle').textContent='انمسكت! 😅';$('resultText').textContent='الباحث لقاك.';$('result').style.display='flex'}
+});
+socket.on('gameOver',d=>{
+ $('resultTitle').textContent=d.winner==='seekers'?'الباحث فاز! 🔎':'المختبئون فازوا! 🎉';
+ $('resultText').textContent=d.text;$('result').style.display='flex';
+});
+function render(){
+ const box=$('players');box.innerHTML='';
+ for(const id in players){
+  const p=players[id];if(p.hidden&&id!==me)continue;
+  const e=document.createElement('div');e.className='p'+(p.hidden?' hiddenp':'');
+  e.style.left=p.x+'px';e.style.top=p.y+'px';e.style.background=p.color||'#00bfa5';
+  e.innerHTML='<b>'+escapeHtml(p.name)+(p.role==='seeker'?' 🔎':'')+'</b>';box.appendChild(e);
+ }
+ const p=players[me];$('capture').style.display=p&&p.role==='seeker'?'block':'none';
+ $('hide').style.display=p&&p.role==='hider'?'block':'none';
+ $('hide').textContent=hidden?'اخرج من الاختباء':'اختبئ';
+}
+function escapeHtml(x){return x.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function move(dx,dy){if(me)socket.emit('move',{dx,dy})}
+[['up',0,-1],['down',0,1],['left',-1,0],['right',1,0]].forEach(([id,x,y])=>{
+ const b=$(id);b.onpointerdown=e=>{e.preventDefault();move(x,y)}
+});
+document.addEventListener('keydown',e=>{
+ if(['ArrowUp','w'].includes(e.key))move(0,-1);if(['ArrowDown','s'].includes(e.key))move(0,1);
+ if(['ArrowLeft','a'].includes(e.key))move(-1,0);if(['ArrowRight','d'].includes(e.key))move(1,0);
+});
+$('hide').onclick=()=>{hidden=!hidden;socket.emit('hide',hidden)};
+$('capture').onclick=()=>socket.emit('capture');
+</script>
+</body></html>
